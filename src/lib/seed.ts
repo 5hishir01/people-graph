@@ -1,0 +1,78 @@
+import type { Person, Edge } from '@/types'
+
+export const SEED_PEOPLE: Person[] = [
+  {
+    id: '1', name: 'Nik Bear Brown', role: 'PI · AI Skunkworks',
+    category: 'mentor',
+    linkedin: 'linkedin.com/in/nikbearbrown', twitter: '@nikbearbrown',
+    github: 'nikbearbrown', email: 'n.brown@northeastern.edu', website: '',
+    tags: ['mentor', 'AI', 'NEU'],
+    notes: 'PI for AICR proposal. AI Skunkworks lead.',
+    x: 340, y: 220, r: 20,
+  },
+  {
+    id: '2', name: 'Rachel Gonsalves', role: 'LangUp teammate',
+    category: 'teammate',
+    linkedin: 'linkedin.com/in/rachel', twitter: '@rachgon',
+    github: 'rachgon', email: 'rachel@neu.edu', website: '',
+    tags: ['teammate', 'frontend'],
+    notes: 'LangUp repo owner.',
+    x: 200, y: 130, r: 15,
+  },
+  {
+    id: '3', name: 'Je Sai Kailash', role: 'AICR cluster team',
+    category: 'teammate',
+    linkedin: 'linkedin.com/in/jesai', twitter: '',
+    github: 'jesai', email: 'jesai@neu.edu', website: '',
+    tags: ['teammate', 'HPC'],
+    notes: 'AICR proposal co-author.',
+    x: 480, y: 140, r: 15,
+  },
+  {
+    id: '4', name: 'Harsh Pampana', role: 'AICR cluster team',
+    category: 'teammate',
+    linkedin: 'linkedin.com/in/harsh', twitter: '@harsh_dev',
+    github: 'harsh-pampana', email: 'harsh@neu.edu', website: '',
+    tags: ['teammate', 'DevOps'],
+    notes: 'AICR proposal co-author.',
+    x: 520, y: 270, r: 15,
+  },
+  {
+    id: '5', name: 'Datadog', role: 'MLOps · H1B sponsor',
+    category: 'employer',
+    linkedin: 'linkedin.com/company/datadog', twitter: '@datadoghq',
+    github: 'DataDog', email: 'recruit@datadoghq.com', website: 'datadoghq.com',
+    tags: ['H1B', 'employer', 'MLOps'],
+    notes: 'Priority H1B target. Verify on h1bdata.info.',
+    x: 170, y: 310, r: 13,
+  },
+  {
+    id: '6', name: 'MathWorks', role: 'Engineering · H1B sponsor',
+    category: 'employer',
+    linkedin: 'linkedin.com/company/mathworks', twitter: '@MATLAB',
+    github: 'mathworks', email: '', website: 'mathworks.com',
+    tags: ['H1B', 'employer'],
+    notes: 'Burlington HQ — check Handshake.',
+    x: 280, y: 390, r: 13,
+  },
+  {
+    id: '7', name: 'MLH Organizer', role: 'Hackathon network',
+    category: 'hackathon',
+    linkedin: 'linkedin.com/in/mlh', twitter: '@MLHacks',
+    github: '', email: 'hi@mlh.io', website: 'mlh.io',
+    tags: ['hackathon', 'network'],
+    notes: 'HackMIT connection.',
+    x: 440, y: 370, r: 13,
+  },
+]
+
+export const SEED_EDGES: Edge[] = [
+  { source: '1', target: '2' },
+  { source: '1', target: '3' },
+  { source: '1', target: '4' },
+  { source: '1', target: '5' },
+  { source: '1', target: '6' },
+  { source: '1', target: '7' },
+  { source: '2', target: '3' },
+  { source: '3', target: '4' },
+]
