@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Person, Edge } from '@/types'
+import type { Person, Edge, NodeCategory } from '@/types'
 import { SEED_PEOPLE, SEED_EDGES } from '@/lib/seed'
 import { getNodeCategory } from '@/lib/colors'
+import { useGroupStore } from '@/store/groupStore'
+import { useChatStore } from '@/store/chatStore'
 
 interface GraphStore {
   people: Person[]
@@ -14,8 +16,8 @@ interface GraphStore {
   selectedId: string | null
   linkSourceId: string | null
   searchQuery: string
+  categoryFilter: NodeCategory | null
 
-  // actions
   addPerson: (p: Omit<Person, 'id' | 'x' | 'y' | 'r' | 'category'>) => void
   updatePerson: (id: string, patch: Partial<Person>) => void
   deletePerson: (id: string) => void
@@ -25,8 +27,11 @@ interface GraphStore {
   setSelected: (id: string | null) => void
   setLinkSource: (id: string | null) => void
   setSearch: (q: string) => void
+  setCategoryFilter: (c: NodeCategory | null) => void
   setViewport: (scale: number, offsetX: number, offsetY: number) => void
   updatePosition: (id: string, x: number, y: number) => void
+  setPositions: (positions: Record<string, { x: number; y: number }>) => void
+  replaceGraphData: (people: Person[], edges: Edge[]) => void
 }
 
 export const useGraphStore = create<GraphStore>()(
@@ -41,6 +46,7 @@ export const useGraphStore = create<GraphStore>()(
       selectedId: null,
       linkSourceId: null,
       searchQuery: '',
+      categoryFilter: null,
 
       addPerson: (p) => {
         const people = get().people
@@ -73,6 +79,8 @@ export const useGraphStore = create<GraphStore>()(
           edges: get().edges.filter((e) => e.source !== id && e.target !== id),
           linkSourceId: get().linkSourceId === id ? null : get().linkSourceId,
         })
+        useGroupStore.getState().removePersonFromAllGroups(id)
+        useChatStore.getState().removeMessagesForPerson(id)
       },
 
       addEdge: (source, target) => {
@@ -103,6 +111,7 @@ export const useGraphStore = create<GraphStore>()(
       setSelected: (id) => set({ selectedId: id }),
       setLinkSource: (id) => set({ linkSourceId: id }),
       setSearch: (q) => set({ searchQuery: q }),
+      setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
 
       setViewport: (scale, offsetX, offsetY) =>
         set({ scale, offsetX, offsetY }),
@@ -112,10 +121,36 @@ export const useGraphStore = create<GraphStore>()(
           people: get().people.map((p) => (p.id === id ? { ...p, x, y } : p)),
         })
       },
+
+      setPositions: (positions) => {
+        set({
+          people: get().people.map((p) =>
+            positions[p.id] ? { ...p, x: positions[p.id].x, y: positions[p.id].y } : p
+          ),
+        })
+      },
+
+      replaceGraphData: (people, edges) => {
+        set({
+          people: people.map((p) => ({
+            ...p,
+            category: getNodeCategory(p.tags),
+          })),
+          edges,
+          hoveredId: null,
+          linkSourceId: null,
+        })
+      },
     }),
     {
       name: 'people-graph-v1',
-      partialize: (s) => ({ people: s.people, edges: s.edges }),
+      partialize: (s) => ({
+        people: s.people,
+        edges: s.edges,
+        scale: s.scale,
+        offsetX: s.offsetX,
+        offsetY: s.offsetY,
+      }),
     }
   )
 )

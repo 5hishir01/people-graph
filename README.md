@@ -22,7 +22,7 @@ npm run dev
 |-------|--------|--------------|
 | 1 | ✅ This build | Graph canvas, hover cards, add/edit/delete, localStorage |
 | 2 | Next | Supabase sync, auth, MCP server for live enrichment |
-| 3 | Later | AR glasses integration (Meta / Snap SDK) |
+| 3 | Later | Globe map view (geo regions for groups), AR glasses integration (Meta / Snap SDK) |
 
 ## Supabase schema (Phase 2)
 

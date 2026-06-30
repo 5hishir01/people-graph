@@ -52,6 +52,8 @@ interface GroupStore {
   setFilter: (f: GroupFilter) => void
   clearFilter: () => void
   toggleGroupVisibility: (id: string) => void
+  removePersonFromAllGroups: (personId: string) => void
+  replaceGroups: (groups: Group[]) => void
 
   // derived
   visibleGroups: () => Group[]
@@ -102,6 +104,16 @@ export const useGroupStore = create<GroupStore>()(
         next.has(id) ? next.delete(id) : next.add(id)
         set({ hiddenGroupIds: next })
       },
+
+      removePersonFromAllGroups: (personId) =>
+        set({
+          groups: get().groups.map((g) => ({
+            ...g,
+            memberIds: g.memberIds.filter((id) => id !== personId),
+          })),
+        }),
+
+      replaceGroups: (groups) => set({ groups }),
 
       visibleGroups: () => {
         const { groups, activeFilter, hiddenGroupIds } = get()

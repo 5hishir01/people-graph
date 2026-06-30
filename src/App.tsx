@@ -72,6 +72,7 @@ export default function App() {
           onToggleChats={() => setSidebarOpen(!sidebarOpen)}
           groupPanelOpen={groupPanelOpen}
           chatSidebarOpen={sidebarOpen}
+          canvasSize={canvasSize}
         />
 
         {linkSource && (
@@ -95,6 +96,7 @@ export default function App() {
             person={hovered.person}
             x={hovered.x}
             y={hovered.y}
+            bounds={canvasSize}
           />
         )}
 

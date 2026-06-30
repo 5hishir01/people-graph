@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useGraphStore } from '@/store/graphStore'
 import { NODE_COLORS } from '@/lib/colors'
 import type { Person } from '@/types'
@@ -12,84 +12,106 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const {
     people, edges, scale, offsetX, offsetY,
-    hoveredId, linkSourceId, searchQuery,
+    hoveredId, linkSourceId, searchQuery, categoryFilter,
     setHovered, setViewport, updatePosition, setLinkSource, addEdge,
   } = useGraphStore()
 
   const dragRef = useRef<{ id: string; lx: number; ly: number } | null>(null)
-  const panRef  = useRef<{ lx: number; ly: number } | null>(null)
+  const panRef = useRef<{ lx: number; ly: number } | null>(null)
   const stateRef = useRef({ scale, offsetX, offsetY })
 
   useEffect(() => { stateRef.current = { scale, offsetX, offsetY } }, [scale, offsetX, offsetY])
 
-  const worldToCanvas = useCallback((wx: number, wy: number) => {
-    const { scale: s, offsetX: ox, offsetY: oy } = stateRef.current
-    return { x: wx * s + ox, y: wy * s + oy }
-  }, [])
+  const neighborIds = useMemo(() => {
+    if (!hoveredId) return new Set<string>()
+    const ids = new Set<string>([hoveredId])
+    for (const e of edges) {
+      if (e.source === hoveredId) ids.add(e.target)
+      if (e.target === hoveredId) ids.add(e.source)
+    }
+    return ids
+  }, [hoveredId, edges])
+
+  const matchesFilters = useCallback((p: Person) => {
+    if (categoryFilter && p.category !== categoryFilter) return false
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return p.name.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q))
+  }, [searchQuery, categoryFilter])
+
+  const nodeAlpha = useCallback((p: Person) => {
+    const matches = matchesFilters(p)
+    if (!matches) return 0.2
+    if (hoveredId) {
+      return neighborIds.has(p.id) ? 1 : 0.18
+    }
+    return 1
+  }, [matchesFilters, hoveredId, neighborIds])
 
   const hitTest = useCallback((cx: number, cy: number): Person | null => {
     const { scale: s, offsetX: ox, offsetY: oy } = stateRef.current
-    const visIds = new Set(
-      people
-        .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
-        .map(p => p.id)
-    )
     for (const p of [...people].reverse()) {
-      if (!visIds.has(p.id)) continue
       const px = p.x * s + ox
       const py = p.y * s + oy
-      const r  = p.r * s + 6
+      const r = p.r * s + 6
       if ((cx - px) ** 2 + (cy - py) ** 2 < r * r) return p
     }
     return null
-  }, [people, searchQuery])
+  }, [people])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = window.devicePixelRatio || 1
-    const ctx  = canvas.getContext('2d')!
-    const W = canvas.width, H = canvas.height
+    const ctx = canvas.getContext('2d')!
+    const W = canvas.width
+    const H = canvas.height
     ctx.clearRect(0, 0, W, H)
     ctx.save()
     ctx.scale(dpr, dpr)
-    const w = W / dpr, h = H / dpr
-    void w; void h
 
     const { scale: s, offsetX: ox, offsetY: oy } = stateRef.current
 
-    const isVisible = (p: Person) => {
-      if (!searchQuery) return true
-      const q = searchQuery.toLowerCase()
-      return p.name.toLowerCase().includes(q) || p.tags.some(t => t.toLowerCase().includes(q))
-    }
-
-    const visIds = new Set(people.filter(isVisible).map(p => p.id))
-
-    // Edges
-    ctx.lineWidth = 0.8
+    // Edges (behind nodes)
     edges.forEach(({ source, target }) => {
-      if (!visIds.has(source) || !visIds.has(target)) return
-      const a = people.find(p => p.id === source)!
-      const b = people.find(p => p.id === target)!
+      const a = people.find((p) => p.id === source)
+      const b = people.find((p) => p.id === target)
+      if (!a || !b) return
+
       const ca = { x: a.x * s + ox, y: a.y * s + oy }
       const cb = { x: b.x * s + ox, y: b.y * s + oy }
+
+      const edgeHighlighted =
+        hoveredId &&
+        (source === hoveredId || target === hoveredId)
+      const edgeDimmed =
+        hoveredId && !edgeHighlighted
+
+      let alpha = 0.07
+      if (edgeHighlighted) alpha = 0.45
+      else if (edgeDimmed) alpha = 0.03
+      else if (!matchesFilters(a) || !matchesFilters(b)) alpha = 0.03
+
       ctx.beginPath()
       ctx.moveTo(ca.x, ca.y)
       ctx.lineTo(cb.x, cb.y)
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)'
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`
+      ctx.lineWidth = edgeHighlighted ? 1.4 : 0.8
       ctx.stroke()
     })
 
     // Nodes
-    people.filter(p => visIds.has(p.id)).forEach(p => {
+    people.forEach((p) => {
+      const alpha = nodeAlpha(p)
       const { x: cx, y: cy } = { x: p.x * s + ox, y: p.y * s + oy }
-      const r  = p.r * s
+      const r = p.r * s
       const isHov = hoveredId === p.id
       const isLink = linkSourceId === p.id
       const colors = NODE_COLORS[p.category]
 
-      // Link-source ring (shift+click to connect)
+      ctx.save()
+      ctx.globalAlpha = alpha
+
       if (isLink) {
         ctx.beginPath()
         ctx.arc(cx, cy, r + 8, 0, Math.PI * 2)
@@ -98,7 +120,6 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
         ctx.stroke()
       }
 
-      // Glow ring on hover
       if (isHov) {
         ctx.beginPath()
         ctx.arc(cx, cy, r + 5, 0, Math.PI * 2)
@@ -106,38 +127,36 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
         ctx.fill()
       }
 
-      // Node fill
       ctx.beginPath()
       ctx.arc(cx, cy, r, 0, Math.PI * 2)
       ctx.fillStyle = isHov ? colors.fill : colors.dim
       ctx.fill()
 
-      // Initials
-      const initials = p.name.split(' ').map(w => w[0]).slice(0, 2).join('')
+      const initials = p.name.split(' ').map((w) => w[0]).slice(0, 2).join('')
       ctx.fillStyle = 'rgba(255,255,255,0.92)'
       ctx.font = `${Math.max(9, 10 * s)}px Inter, sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(initials, cx, cy)
 
-      // Label below (only show if scale > 0.6)
-      if (s > 0.6) {
+      if (s > 0.6 && alpha > 0.5) {
         ctx.fillStyle = isHov ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)'
         ctx.font = `${Math.max(9, 9 * s)}px Inter, sans-serif`
         ctx.fillText(p.name.split(' ')[0], cx, cy + r + 10 * s)
       }
+
+      ctx.restore()
     })
 
     ctx.restore()
-  }, [people, edges, hoveredId, linkSourceId, searchQuery])
+  }, [people, edges, hoveredId, linkSourceId, searchQuery, categoryFilter, matchesFilters, nodeAlpha])
 
-  // Resize
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const obs = new ResizeObserver(() => {
       const dpr = window.devicePixelRatio || 1
-      canvas.width  = canvas.offsetWidth  * dpr
+      canvas.width = canvas.offsetWidth * dpr
       canvas.height = canvas.offsetHeight * dpr
       draw()
     })
@@ -147,7 +166,6 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
 
   useEffect(() => { draw() }, [draw])
 
-  // Mouse events
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect()
     const cx = e.clientX - rect.left
@@ -156,7 +174,7 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
     if (dragRef.current) {
       const { id, lx, ly } = dragRef.current
       const { scale: s } = stateRef.current
-      const p = people.find(p => p.id === id)!
+      const p = people.find((p) => p.id === id)!
       updatePosition(id, p.x + (cx - lx) / s, p.y + (cy - ly) / s)
       dragRef.current = { id, lx: cx, ly: cy }
       return
@@ -181,13 +199,9 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
     const cy = e.clientY - rect.top
     const hit = hitTest(cx, cy)
     if (e.shiftKey && hit) {
-      if (!linkSourceId) {
-        setLinkSource(hit.id)
-      } else if (linkSourceId !== hit.id) {
-        addEdge(linkSourceId, hit.id)
-      } else {
-        setLinkSource(null)
-      }
+      if (!linkSourceId) setLinkSource(hit.id)
+      else if (linkSourceId !== hit.id) addEdge(linkSourceId, hit.id)
+      else setLinkSource(null)
       return
     }
     if (hit) {
@@ -205,13 +219,11 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
     const cx = e.clientX - rect.left
     const cy = e.clientY - rect.top
     dragRef.current = null
-    panRef.current  = null
+    panRef.current = null
     canvasRef.current!.style.cursor = 'grab'
-    // Click = mousedown + mouseup on same node without moving much
     if (wasDrag) {
-      const p = people.find(p => p.id === wasDrag.id)!
       const dist = Math.hypot(cx - wasDrag.lx, cy - wasDrag.ly)
-      if (dist < 4) onNodeClick(p)
+      if (dist < 4) onNodeClick(people.find((p) => p.id === wasDrag.id)!)
     }
   }, [people, onNodeClick])
 
@@ -230,7 +242,7 @@ export function GraphCanvas({ onNodeClick, onHoverChange }: Props) {
 
   const onMouseLeave = useCallback(() => {
     dragRef.current = null
-    panRef.current  = null
+    panRef.current = null
     setHovered(null)
     onHoverChange(null, 0, 0)
   }, [setHovered, onHoverChange])

@@ -13,6 +13,8 @@ interface ChatStore {
   setSidebarOpen: (open: boolean) => void
   addMessage: (personId: string, content: string) => void
   deleteMessage: (id: string) => void
+  removeMessagesForPerson: (personId: string) => void
+  replaceMessages: (messages: ChatMessage[]) => void
   messagesFor: (personId: string) => ChatMessage[]
 }
 
@@ -51,6 +53,11 @@ export const useChatStore = create<ChatStore>()(
 
       deleteMessage: (id) =>
         set({ messages: get().messages.filter((m) => m.id !== id) }),
+
+      removeMessagesForPerson: (personId) =>
+        set({ messages: get().messages.filter((m) => m.personId !== personId) }),
+
+      replaceMessages: (messages) => set({ messages }),
 
       messagesFor: (personId) =>
         get()
